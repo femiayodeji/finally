@@ -22,7 +22,7 @@ The user runs a single Docker command (or a provided start script). A browser op
 ### What the User Can Do
 
 - **Watch prices stream** — prices flash green (uptick) or red (downtick) with subtle CSS animations that fade
-- **View sparkline mini-charts** — price action beside each ticker in the watchlist, accumulated on the frontend from the SSE stream since page load (sparklines fill in progressively)
+- **View sparkline mini-charts** — price action beside each ticker in the watchlist, backfilled from the backend's recent price history on load and extended live from the SSE stream (sparklines render populated, then keep growing)
 - **Click a ticker** to see a larger detailed chart in the main chart area
 - **Buy and sell shares** — market orders only, instant fill at current price, no fees, no confirmation dialog
 - **Monitor their portfolio** — a heatmap (treemap) showing positions sized by weight and colored by P&L, plus a P&L chart tracking total portfolio value over time
@@ -68,6 +68,16 @@ The user runs a single Docker command (or a provided start script). A browser op
 - **Real-time data**: Server-Sent Events (SSE) — simpler than WebSockets, one-way server→client push, works everywhere
 - **AI integration**: LiteLLM → OpenRouter (Cerebras for fast inference), with structured outputs for trade execution
 - **Market data**: Environment-variable driven — simulator by default, real data via Massive API if key provided
+
+### Core Principle: the Backend Owns the Core
+
+The backend is the single source of truth for all core state and computation. Portfolio valuation, P&L, price change %, and short-term price history are computed and held **server-side**; the frontend is a thin rendering layer that displays backend-computed values and never derives core numbers itself. Even where computing on the client would be marginally faster, the core stays on the server. This buys:
+
+- **Scalability** — the in-memory price cache/history layer is the one seam that becomes a shared store (e.g., Redis) for horizontal, multi-user scaling later, with no change to the frontend or the computation logic
+- **Security** — all validation (trades, watchlist, LLM-issued actions) and money math happen server-side; the client is never trusted to compute or enforce anything
+- **Reliability & consistency** — every client sees the same authoritative numbers, independent of any single browser session; charts and change % survive reloads because their reference data lives on the server
+
+Speed is still a priority — it is achieved with fast inference (Cerebras), in-memory caches, and SSE push, **not** by offloading core logic to the client.
 
 ### Why These Choices
 
@@ -155,6 +165,7 @@ Both the simulator and the Massive client implement the same abstract interface.
 - Occasional random "events" — sudden 2-5% moves on a ticker for drama
 - Starts from realistic seed prices (e.g., AAPL ~$190, GOOGL ~$175, etc.)
 - Runs as an in-process background task — no external dependencies
+- **New tickers get default parameters** — a ticker added without a curated seed entry is assigned a deterministic default seed price derived from its symbol (stable across restarts) plus default drift/volatility and no correlation group. Any well-formed symbol therefore "just works" without a hand-authored entry.
 
 ### Massive API (Optional)
 
@@ -164,32 +175,45 @@ Both the simulator and the Massive client implement the same abstract interface.
 - Paid tiers: poll every 2-15 seconds depending on tier
 - Parses REST response into the same format as the simulator
 
+### Tracked Ticker Set
+
+The set of tickers the price source tracks — and therefore streams over SSE — is the **union of the watchlist and every ticker with an open position**, not the watchlist alone. A user can sell part of a holding, remove that ticker from the watchlist, and still own shares; portfolio valuation (§8) needs a live price for every held ticker.
+
+- Adding a watchlist ticker, or opening a new position, adds the ticker to the tracked set
+- Removing a watchlist ticker stops tracking it **only if no open position remains** for that ticker
+- A ticker with neither a watchlist entry nor an open position is dropped from tracking
+
 ### Shared Price Cache
 
 - A single background task (simulator or Massive poller) writes to an in-memory price cache
-- The cache holds the latest price, previous price, and timestamp for each ticker
-- SSE streams read from this cache and push updates to connected clients
-- This architecture supports future multi-user scenarios without changes to the data layer
+- The cache holds, per ticker: the latest price, previous price, timestamp, a **session reference (open) price** captured on first observation after process start, and a **bounded rolling price history** (ring buffer, ~600 points ≈ the last few minutes at 500ms)
+- The cache computes **change %** server-side (latest vs. session reference) so every client sees the same value — the frontend never computes it
+- SSE streams and REST endpoints both read from this cache; it is the single source of truth for prices, history, and change %
+- **History is in-memory only** — not persisted to SQLite (per-tick DB writes would be wasteful and hurt latency). Durable time-series persistence is reserved for `portfolio_snapshots` (§7). The rolling buffer resets on restart; charts backfill from it on connect and extend live via SSE
+- This layer is the seam for future multi-user scaling: it moves to a shared store (e.g., Redis) without touching downstream code
+
+> **Note:** the market-data subsystem (`MARKET_DATA_SUMMARY.md`) is already built with latest/previous/timestamp. The session reference price, rolling history buffer, and server-side change % are **additive extensions** to `PriceCache`/`PriceUpdate` to satisfy the backend-owns-the-core principle (§3).
 
 ### SSE Streaming
 
 - Endpoint: `GET /api/stream/prices`
 - Long-lived SSE connection; client uses native `EventSource` API
-- Server pushes price updates for all tickers known to the system at a regular cadence (~500ms) — in the single-user model this is equivalent to the user's watchlist
-- Each SSE event contains ticker, price, previous price, timestamp, and change direction
+- Server pushes price updates for all tracked tickers (watchlist ∪ open positions, see above) at a regular cadence (~500ms)
+- Each SSE event contains ticker, price, previous price, timestamp, change direction, and the backend-computed **change %** (vs. session reference)
 - Client handles reconnection automatically (EventSource has built-in retry)
 
 ---
 
 ## 7. Database
 
-### SQLite with Lazy Initialization
+### SQLite with Initialization on Startup
 
-The backend checks for the SQLite database on startup (or first request). If the file doesn't exist or tables are missing, it creates the schema and seeds default data. This means:
+The backend initializes the SQLite database **on startup, before the market-data background task starts**. If the file doesn't exist or tables are missing, it creates the schema and seeds default data; the market-data task then reads the seeded watchlist to know what to track. This means:
 
 - No separate migration step
 - No manual database setup
 - Fresh Docker volumes start with a clean, seeded database automatically
+- The price task always has a populated watchlist to seed tracking at boot (no lazy first-request gap)
 
 ### Schema
 
@@ -239,6 +263,10 @@ All tables include a `user_id` column defaulting to `"default"`. This is hardcod
 - `actions` TEXT (JSON — trades executed, watchlist changes made; null for user messages)
 - `created_at` TEXT (ISO timestamp)
 
+### Realized P&L — Out of Scope
+
+The platform tracks only **cash** and `avg_cost`-based **unrealized** P&L. Realized gains/losses from sells are intentionally not stored; account performance is represented by total portfolio value over time (`portfolio_snapshots`). If the chat assistant is asked "how much have I made?", it reasons from unrealized P&L plus cash, not a realized-gains ledger.
+
 ### Default Seed Data
 
 - One user profile: `id="default"`, `cash_balance=10000.0`
@@ -251,7 +279,8 @@ All tables include a `user_id` column defaulting to `"default"`. This is hardcod
 ### Market Data
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/stream/prices` | SSE stream of live price updates |
+| GET | `/api/stream/prices` | SSE stream of live price updates (incl. server-computed change %) |
+| GET | `/api/prices/{ticker}/history` | Recent in-memory price history for a ticker (backfills charts/sparklines on load) |
 
 ### Portfolio
 | Method | Path | Description |
@@ -264,8 +293,8 @@ All tables include a `user_id` column defaulting to `"default"`. This is hardcod
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/api/watchlist` | Current watchlist tickers with latest prices |
-| POST | `/api/watchlist` | Add a ticker: `{ticker}` |
-| DELETE | `/api/watchlist/{ticker}` | Remove a ticker |
+| POST | `/api/watchlist` | Add a ticker: `{ticker}` (validated — see below) |
+| DELETE | `/api/watchlist/{ticker}` | Remove from watchlist; price tracking continues while a position is still open |
 
 ### Chat
 | Method | Path | Description |
@@ -276,6 +305,27 @@ All tables include a `user_id` column defaulting to `"default"`. This is hardcod
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/api/health` | Health check (for Docker/deployment) |
+
+### Trade Execution Semantics
+
+`POST /api/portfolio/trade` and LLM-issued trades share one code path:
+
+- **Market order, instant fill** at the current cached price for the ticker
+- **Validation**: buys require sufficient cash; sells require sufficient shares held. Failed validation returns an error (surfaced to the user, or to the LLM for chat-issued trades) and changes nothing
+- **Buy**: `avg_cost` is recomputed as the share-weighted average of the existing lot and the new fill; cash decreases by `quantity × price`
+- **Sell**: `avg_cost` is unchanged; cash increases by `quantity × price`. When the resulting quantity reaches 0, the position **row is deleted** (positions has UNIQUE `(user_id, ticker)`; the heatmap and positions table iterate live rows)
+- **Money precision**: cash, price, and `avg_cost` are rounded to cents (2 dp) at execution to keep the ledger clean
+- **Snapshot**: a `portfolio_snapshots` row is written immediately after a successful trade (in addition to the 30s cadence)
+- Opening a position adds its ticker to the tracked set (§6); a fully-closed position drops out of tracking unless it is still on the watchlist
+
+### Watchlist Validation
+
+`POST /api/watchlist` validates the ticker before adding:
+
+- Normalized to uppercase; must match a simple symbol format (1–5 letters)
+- **Simulator mode**: any well-formed symbol is accepted — unknown tickers get a deterministic default seed price and default GBM parameters (§6)
+- **Massive mode**: the symbol must resolve to real data; symbols Massive can't price are rejected as invalid
+- Duplicate adds are idempotent (UNIQUE `(user_id, ticker)`)
 
 ---
 
@@ -290,7 +340,7 @@ There is an OPENROUTER_API_KEY in the .env file in the project root.
 When the user sends a chat message, the backend:
 
 1. Loads the user's current portfolio context (cash, positions with P&L, watchlist with live prices, total portfolio value)
-2. Loads recent conversation history from the `chat_messages` table
+2. Loads recent conversation history from the `chat_messages` table, capped at the **last 20 messages** (~10 exchanges) so the prompt stays bounded as history grows
 3. Constructs a prompt with a system message, portfolio context, conversation history, and the user's new message
 4. Calls the LLM via LiteLLM → OpenRouter, requesting structured output, using the cerebras-inference skill
 5. Parses the complete structured JSON response
@@ -316,7 +366,11 @@ The LLM is instructed to respond with JSON matching this schema:
 
 - `message` (required): The conversational text shown to the user
 - `trades` (optional): Array of trades to auto-execute. Each trade goes through the same validation as manual trades (sufficient cash for buys, sufficient shares for sells)
-- `watchlist_changes` (optional): Array of watchlist modifications
+- `watchlist_changes` (optional): Array of watchlist modifications. Each entry's `action` is `"add"` or `"remove"` (mirroring `POST`/`DELETE /api/watchlist`); adds go through the same validation as manual adds (§8)
+
+### Structured Output Reliability
+
+Strict structured-output (JSON-schema) support on `openrouter/openai/gpt-oss-120b` via Cerebras must be verified early against the provider (per the cerebras skill). If the provider does not strictly enforce the schema, the backend falls back to: request JSON, parse and validate against the schema, and retry once on malformed output before returning a graceful error. Either way the backend **validates the response before auto-executing any trade** — it never acts on an unvalidated payload.
 
 ### Auto-Execution
 
@@ -352,8 +406,8 @@ When `LLM_MOCK=true`, the backend returns deterministic mock responses instead o
 
 The frontend is a single-page application with a dense, terminal-inspired layout. The specific component architecture and layout system is up to the Frontend Engineer, but the UI should include these elements:
 
-- **Watchlist panel** — grid/table of watched tickers with: ticker symbol, current price (flashing green/red on change), daily change %, and a sparkline mini-chart (accumulated from SSE since page load)
-- **Main chart area** — larger chart for the currently selected ticker, with at minimum price over time. Clicking a ticker in the watchlist selects it here.
+- **Watchlist panel** — grid/table of watched tickers with: ticker symbol, current price (flashing green/red on change), change % (server-computed, from the SSE payload — the frontend just displays it), and a sparkline mini-chart backfilled from `/api/prices/{ticker}/history` on load and extended live from SSE
+- **Main chart area** — larger chart for the currently selected ticker, price over time. Clicking a ticker in the watchlist selects it here. On selection the series is fetched from `/api/prices/{ticker}/history` so it renders populated immediately, then extended live from the SSE stream.
 - **Portfolio heatmap** — treemap visualization where each rectangle is a position, sized by portfolio weight, colored by P&L (green = profit, red = loss)
 - **P&L chart** — line chart showing total portfolio value over time, using data from `portfolio_snapshots`
 - **Positions table** — tabular view of all positions: ticker, quantity, avg cost, current price, unrealized P&L, % change
@@ -368,6 +422,9 @@ The frontend is a single-page application with a dense, terminal-inspired layout
 - Price flash effect: on receiving a new price, briefly apply a CSS class with background color transition, then remove it
 - All API calls go to the same origin (`/api/*`) — no CORS configuration needed
 - Tailwind CSS for styling with a custom dark theme
+- **Backend owns the numbers (§3).** Change %, P&L, valuation, and price history all come from the server ready-to-render; the frontend does not compute them. Charts backfill from `/api/prices/{ticker}/history`, then extend from SSE
+- **SSE is the source of truth for live prices.** REST responses (`/api/watchlist`, `/api/portfolio`) carry a price snapshot for initial paint only; after mount the frontend updates prices from the SSE stream and does not poll REST endpoints for price refreshes
+- **Change % is stable across reloads** because its reference (session open) lives in the server-side cache and is delivered in the SSE payload — every client and every tab agrees
 
 ---
 
@@ -454,3 +511,33 @@ The container is designed to deploy to AWS App Runner, Render, or any container 
 - Portfolio visualization: heatmap renders with correct colors, P&L chart has data points
 - AI chat (mocked): send a message, receive a response, trade execution appears inline
 - SSE resilience: disconnect and verify reconnection
+
+---
+
+## 13. Resolved Design Decisions
+
+_Outcomes of the documentation review. Each decision has been folded into the sections above; this log records what was decided and why. The market-data subsystem (§6) was already complete per `MARKET_DATA_SUMMARY.md`, so several of these were informed by what that implementation actually does._
+
+1. **Tracked ticker set = watchlist ∪ open positions** (§6 *Tracked Ticker Set*, §8). Price tracking and the SSE stream cover every held ticker, not just the watchlist. `DELETE /api/watchlist/{ticker}` stops tracking only when no open position remains — otherwise portfolio valuation would lose the price it needs.
+
+2. **Unknown tickers** (§6, §8 *Watchlist Validation*). Simulator mode accepts any well-formed symbol, assigning a deterministic default seed price (stable across restarts) + default GBM params so new tickers "just work" for the demo. Massive mode rejects symbols it can't price. Both paths validate symbol format (1–5 letters, uppercased) first.
+
+3. **DB initialized on startup** (§7). Schema creation + seeding happen at startup, before the market-data task reads the watchlist. The ambiguous "or first request" wording is gone.
+
+4. **Backend-owned price history & change %** (§3, §6, §8, §10). Per the *backend owns the core* principle, the server maintains a bounded in-memory rolling price history (ring buffer) and a session reference price per ticker, computes **change %** server-side, and exposes history via `GET /api/prices/{ticker}/history`. Charts and sparklines backfill from that endpoint on load and extend live via SSE; change % is delivered in the SSE payload. History is **in-memory only** (not persisted to SQLite — per-tick writes would hurt latency); the durable time series remains `portfolio_snapshots`. _(This supersedes the review's earlier client-side "session change %" simplification, which was reversed at the user's direction to keep core logic on the backend.)_
+
+5. **`watchlist_changes.action`** (§9) — allowed values are `"add"` and `"remove"`, mirroring the watchlist endpoints.
+
+6. **Position closed at qty 0** (§8 *Trade Execution Semantics*) — the position row is deleted when quantity reaches 0.
+
+7. **Realized P&L out of scope** (§7) — only cash and unrealized (`avg_cost`-based) P&L are tracked; performance is shown via total portfolio value over time.
+
+8. **Conversation-history cap** (§9) — the chat prompt includes at most the last 20 messages (~10 exchanges).
+
+9. **Structured-output fallback** (§9 *Structured Output Reliability*) — verify strict structured outputs on the model/provider early; otherwise fall back to JSON + schema-validate + one retry. The backend always validates before auto-executing trades.
+
+10. **Money precision** (§8) — cash, price, and `avg_cost` are rounded to cents at trade execution.
+
+11. **SSE is the source of truth for live prices** (§10 *Technical Notes*) — REST price fields are initial-paint snapshots only; the frontend does not poll them for live updates.
+
+12. **Backend owns the core** (§3 *Core Principle*) — the server is authoritative for all state and computation (valuation, P&L, change %, price history); the frontend is a thin rendering layer. Chosen for multi-user scalability (the cache/history layer is the seam to a shared store like Redis), server-side security/validation, and cross-client consistency, without sacrificing speed (fast inference + in-memory caches + SSE).
