@@ -1,48 +1,66 @@
 # Review Feedback (since last commit)
 
 ## Scope Reviewed
-- `README.md` (modified)
+- `.claude/agents/change-reviewer.md` (deleted)
 - `.claude/settings.json` (modified)
-- `planning/REVIEW.md` (deleted in working tree)
+- `README.md` (modified)
+- `planning/REVIEW.md` (deleted in working tree; recreated by this run)
+- `.claude-plugin/` (new, untracked)
+- `independent-reviewer/` (new, untracked)
 
 ## Overall Assessment
-The `README.md` rewrite is a strong improvement in honesty and usability: it now reflects the current repository state, provides executable development commands, and removes misleading “already shipped” assumptions.
+The direction is good: the review workflow is moving from a fragile hook-driven approach toward a plugin-based setup, and the README is cleaner and more accurate.  
+However, there are two medium-risk workflow concerns to resolve before full approval:
 
-There is one **critical workflow risk** introduced in `.claude/settings.json`: the Stop hook invokes Codex to run this review prompt, which can recursively trigger itself and lead to repeated/looped review runs.
+1. The old `change-reviewer` subagent was deleted while new untracked reviewer artifacts exist, which may leave teammates without a documented fallback path.
+2. New untracked plugin directories are present but not committed, so the configuration now references a plugin that may not exist for other contributors/CI environments.
 
 ## Findings
 
-### 1) README accuracy and developer experience — **Good change**
-- The new `Status` section clearly states what is built vs pending, reducing expectation mismatch.
-- Quick-start commands now match what exists (`backend`, `uv sync`, `pytest`, demo script), unlike prior Docker-based instructions that were not currently runnable.
-- Project structure listing now reflects actual directories.
+### 1) `README.md` edit quality — **Good change**
+- Renaming `## Vision` to `## Features` improves clarity and expectation setting.
+- Copy edits make feature bullets crisper without changing meaning.
+- Removing brittle numeric claims (`73 passing tests, 84% coverage`) reduces documentation drift risk.
 
-**Impact:** positive; reduces onboarding friction and confusion.
+**Impact:** positive; improves maintainability and onboarding accuracy.
 
-### 2) `.claude/settings.json` Stop hook recursion risk — **High severity**
-- Added Stop hook command:
-  - `codex exec --sandbox workspace-write "Please review all changes since the last commit and write results to a file called planning/REVIEW.md"`
-- Because this command itself is a Codex run that reaches a stop condition, it can trigger the same Stop hook again (directly or indirectly depending on hook scoping), creating an accidental loop or repeated invocations.
+### 2) Hook recursion risk appears removed — **Good change with caveat**
+- `.claude/settings.json` no longer contains the `hooks.Stop` command that launched Codex recursively.
+- This likely removes the prior self-triggering review loop risk.
+
+**Caveat:** the replacement depends on a local plugin (`independent-reviewer@femi-tools`), which is not yet committed (see finding #3).
+
+### 3) Config references untracked plugin — **Medium severity**
+- `.claude/settings.json` now enables `independent-reviewer@femi-tools`.
+- `.claude-plugin/` and `independent-reviewer/` are untracked in git status.
 
 **Why this matters:**
-- Can spawn redundant review executions.
-- May overwrite `planning/REVIEW.md` repeatedly.
-- Wastes time/tokens and makes session behavior unpredictable.
+- Other machines/teammates may fail to load the plugin.
+- CI or fresh clones could silently lose review automation.
+- Behavior becomes environment-specific and harder to debug.
 
 **Recommended fix:**
-- Guard the hook with a non-recursive condition (e.g., skip if current prompt/session originated from the review hook).
-- Or replace `Stop` with a safer/manual command alias for review generation.
-- Or write review via a lightweight script that does not invoke Codex recursively.
+- Commit the plugin directories/files required by `independent-reviewer@femi-tools`, or
+- Gate plugin enablement behind documented setup steps and provide a safe fallback when absent.
 
-### 3) Deletion of `planning/REVIEW.md` in working tree — **Expected but noteworthy**
-- The file is currently deleted in git status, but this review run recreates it.
-- This is acceptable if the intended workflow is “ephemeral regenerated review artifact.”
+### 4) Deletion of `.claude/agents/change-reviewer.md` — **Reasonable but document migration**
+- Removing the old subagent is sensible if replaced by plugin-based review.
+- Currently there is no in-repo migration note explaining the new expected workflow.
+
+**Recommended fix:**
+- Add a short note in `README.md` or `planning/` docs describing how reviews are now triggered and prerequisites.
+
+### 5) `planning/REVIEW.md` lifecycle — **Needs workflow decision**
+- The file was deleted in working tree and is now regenerated.
 
 **Recommendation:**
-- Decide whether `planning/REVIEW.md` should be versioned as a stable document or treated as generated output; align `.gitignore`/workflow accordingly.
+- Decide whether `planning/REVIEW.md` is:
+  - a tracked, human-readable audit artifact, or
+  - generated output (then consider `.gitignore` + generation command docs).
 
 ## Verdict
 - `README.md`: **Approve**
-- `.claude/settings.json`: **Request changes** (add recursion guard or redesign hook trigger)
+- `.claude/settings.json`: **Request changes** (until plugin availability is reproducible)
+- Workflow migration (`change-reviewer` removal + plugin adoption): **Request changes** (add docs / commit plugin assets)
 
-Overall: **Not fully approvable yet due to hook recursion risk.**
+Overall: **Conditionally approvable after reproducibility and documentation fixes.**

@@ -4,9 +4,9 @@ A visually stunning, AI-powered trading workstation: stream live market data, tr
 
 Built entirely by coding agents as the capstone project for an agentic AI coding course.
 
-## Vision
+## Features
 
-- **Live price streaming** via SSE, with green/red flash animations and sparklines
+- **Live price streaming** via SSE — green/red flash animations and sparklines
 - **Simulated portfolio** — $10k virtual cash, market orders, instant fills, no fees
 - **Portfolio visualizations** — treemap heatmap, P&L chart, positions table
 - **AI chat assistant** — analyzes holdings, suggests trades, and auto-executes them
@@ -30,8 +30,8 @@ The full specification lives in [`planning/PLAN.md`](planning/PLAN.md).
 🚧 **In progress.** The **market-data subsystem** is complete, tested, and reviewed
 ([summary](planning/MARKET_DATA_SUMMARY.md)): a unified `MarketDataSource` interface with a
 correlated-GBM simulator and a Massive REST poller, feeding a thread-safe in-memory price cache
-and an SSE endpoint (73 passing tests, 84% coverage). The portfolio, watchlist, chat, database,
-frontend, and Docker packaging are still to be built.
+and an SSE endpoint. The portfolio, watchlist, chat, database, frontend, and Docker packaging are
+still to be built.
 
 ## Development
 
