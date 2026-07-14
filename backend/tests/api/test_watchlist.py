@@ -1,13 +1,15 @@
 """Tests for the watchlist repo + service (PLAN.md §6 Tracked Ticker Set, §8
-Watchlist Validation). Route-level tests for `/api/watchlist` are added in
-Task 2 once the router exists.
+Watchlist Validation) and the `GET/POST/DELETE /api/watchlist` routes
+(WATCH-01..04).
 """
 
 from __future__ import annotations
 
 import pytest
+from fastapi.testclient import TestClient
 
 from app.db import database, watchlist_repo
+from app.main import create_app
 from app.market.cache import PriceCache
 from app.market.simulator import SimulatorDataSource
 from app.services import watchlist_service
@@ -215,3 +217,60 @@ class TestListWatchlist:
         assert aapl["price"] == 190.0
         assert aapl["direction"] == "flat"
         assert aapl["session_change_percent"] == 0.0
+
+
+@pytest.fixture()
+def client(tmp_path, monkeypatch):
+    """A TestClient with lifespan run, pointed at hermetic tmp paths."""
+    monkeypatch.setenv("FINALLY_DB_PATH", str(tmp_path / "finally_test.db"))
+    monkeypatch.setenv("FINALLY_STATIC_DIR", str(tmp_path / "nonexistent_static"))
+
+    app = create_app()
+    with TestClient(app) as test_client:
+        yield test_client
+
+
+class TestWatchlistRoutes:
+    """GET/POST/DELETE /api/watchlist (WATCH-01..04)."""
+
+    def test_get_watchlist_returns_seeded_tickers(self, client):
+        response = client.get("/api/watchlist")
+
+        assert response.status_code == 200
+        body = response.json()
+        tickers = {entry["ticker"] for entry in body["watchlist"]}
+        assert len(body["watchlist"]) == 10
+        assert "AAPL" in tickers
+
+    def test_post_adds_valid_ticker(self, client):
+        response = client.post("/api/watchlist", json={"ticker": "pypl"})
+
+        assert response.status_code == 200
+        assert response.json() == {"ticker": "PYPL"}
+
+        followup = client.get("/api/watchlist")
+        tickers = {entry["ticker"] for entry in followup.json()["watchlist"]}
+        assert "PYPL" in tickers
+
+    def test_post_invalid_symbol_returns_400_with_detail(self, client):
+        response = client.post("/api/watchlist", json={"ticker": "TOOLONG"})
+
+        assert response.status_code == 400
+        assert "detail" in response.json()
+
+    def test_post_numeric_symbol_returns_400(self, client):
+        response = client.post("/api/watchlist", json={"ticker": "12"})
+
+        assert response.status_code == 400
+
+    def test_delete_removes_ticker(self, client):
+        client.post("/api/watchlist", json={"ticker": "pypl"})
+
+        response = client.delete("/api/watchlist/PYPL")
+
+        assert response.status_code == 200
+        assert response.json() == {"ticker": "PYPL"}
+
+        followup = client.get("/api/watchlist")
+        tickers = {entry["ticker"] for entry in followup.json()["watchlist"]}
+        assert "PYPL" not in tickers
