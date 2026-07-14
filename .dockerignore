@@ -1,0 +1,36 @@
+# Version control / editor / IDE
+.git
+.github
+.idea
+.vscode
+.claude
+
+# Docs (not needed inside the image)
+planning
+README.md
+LICENSE
+
+# Frontend build artifacts (rebuilt fresh in the Docker build)
+frontend/node_modules
+frontend/out
+frontend/.next
+
+# Backend build/venv artifacts (rebuilt fresh via uv sync in the Docker build)
+backend/.venv
+backend/tests
+**/__pycache__
+**/*.py[co]
+**/.pytest_cache
+**/.ruff_cache
+**/.coverage
+**/htmlcov
+
+# Runtime data / secrets — never bake these into the image
+db
+.env
+.env.*
+!.env.example
+
+# E2E test infra (built/run separately, see test/docker-compose.test.yml)
+test
+scripts

@@ -1,0 +1,122 @@
+@import "tailwindcss";
+
+/*
+ * FinAlly design tokens.
+ *
+ * Palette and layout follow planning/PLAN.md §2 (near-black backgrounds,
+ * no pure black; accent yellow/blue/purple are fixed by spec). Everything
+ * else — the panel/border scale, the up/down greens/reds, and the type
+ * system — is this app's own terminal identity:
+ *   - font-display (Space Grotesk): wordmark + section labels only
+ *   - font-body (Inter): UI chrome, labels, chat copy
+ *   - font-data (JetBrains Mono, tabular figures): every number — prices,
+ *     quantities, P&L, timestamps — so columns of digits line up like a
+ *     real ticker.
+ */
+@theme inline {
+  --color-base: #0d1117;
+  --color-panel: #121820;
+  --color-panel-alt: #161d27;
+  --color-elevated: #1a2230;
+
+  --color-line: #232b37;
+  --color-line-soft: #1a212b;
+
+  --color-ink: #e6edf3;
+  --color-ink-dim: #8b96a5;
+  --color-ink-faint: #57616f;
+
+  --color-yellow: #ecad0a;
+  --color-blue: #209dd7;
+  --color-purple: #753991;
+
+  --color-up: #3fb950;
+  --color-up-dim: #1c3a24;
+  --color-down: #f85149;
+  --color-down-dim: #3a1e1c;
+
+  --font-display: var(--font-space-grotesk);
+  --font-body: var(--font-inter);
+  --font-data: var(--font-jetbrains-mono);
+}
+
+:root {
+  color-scheme: dark;
+}
+
+* {
+  border-color: var(--color-line);
+}
+
+body {
+  font-variant-numeric: tabular-nums;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--color-blue) 35%, transparent);
+}
+
+/* Thin, terminal-appropriate scrollbars. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--color-line);
+  border-radius: 4px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Price flash — brief background wash that fades, per PLAN.md §2. Applied
+   to a remounted element (see Sparkline/WatchlistRow) so the animation
+   restarts cleanly on every tick rather than relying on a class toggle. */
+@keyframes flash-up {
+  0% {
+    background-color: color-mix(in srgb, var(--color-up) 30%, transparent);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+@keyframes flash-down {
+  0% {
+    background-color: color-mix(in srgb, var(--color-down) 30%, transparent);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+.flash-up {
+  animation: flash-up 600ms ease-out;
+}
+.flash-down {
+  animation: flash-down 600ms ease-out;
+}
+
+/* Connection status dot pulse (green = connected). */
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+.pulse-dot {
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flash-up,
+  .flash-down,
+  .pulse-dot {
+    animation: none !important;
+  }
+}

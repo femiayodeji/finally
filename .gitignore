@@ -205,3 +205,18 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# FinAlly — Node/frontend build output
+node_modules/
+frontend/out/
+frontend/.next/
+
+# FinAlly — runtime SQLite database (volume-mounted, see db/.gitkeep)
+db/*.db
+db/*.db-*
+
+# FinAlly — Playwright test artifacts
+test/test-results/
+test/playwright-report/
+test/node_modules/
+test/.e2e-data/

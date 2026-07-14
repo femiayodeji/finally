@@ -14,6 +14,18 @@ class PriceUpdate:
     price: float
     previous_price: float
     timestamp: float = field(default_factory=time.time)  # Unix seconds
+    session_reference: float | None = None  # First observed price after process start
+
+    @property
+    def session_change_percent(self) -> float:
+        """Percentage change from the session reference (open) price.
+
+        This is the stable, per-session change % shown in the UI — unlike
+        `change_percent`, it doesn't reset every tick.
+        """
+        if not self.session_reference:
+            return 0.0
+        return round((self.price - self.session_reference) / self.session_reference * 100, 4)
 
     @property
     def change(self) -> float:
@@ -45,5 +57,6 @@ class PriceUpdate:
             "timestamp": self.timestamp,
             "change": self.change,
             "change_percent": self.change_percent,
+            "session_change_percent": self.session_change_percent,
             "direction": self.direction,
         }

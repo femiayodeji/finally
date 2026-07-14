@@ -1,0 +1,19 @@
+# Convenience wrapper around `docker build` / `docker run` (PLAN.md §11).
+# Not required to run FinAlly — the start/stop scripts in scripts/ wrap the
+# same `docker` commands directly — but handy for `docker compose up`.
+
+services:
+  app:
+    build: .
+    image: finally:latest
+    container_name: finally-app
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - finally-data:/app/db
+    restart: unless-stopped
+
+volumes:
+  finally-data:

@@ -67,7 +67,35 @@ class TestPriceUpdate:
         assert result["timestamp"] == 1234567890.0
         assert result["change"] == 0.50
         assert result["change_percent"] == 0.2632  # (0.50 / 190.00) * 100
+        assert result["session_change_percent"] == 0.0  # no session_reference set
         assert result["direction"] == "up"
+
+    def test_session_change_percent_defaults_to_zero_without_reference(self):
+        """No session_reference set -> session_change_percent is 0.0."""
+        update = PriceUpdate(ticker="AAPL", price=190.50, previous_price=190.00, timestamp=1234567890.0)
+        assert update.session_change_percent == 0.0
+
+    def test_session_change_percent_computed_from_reference(self):
+        """session_change_percent tracks the session open, not the previous tick."""
+        update = PriceUpdate(
+            ticker="AAPL",
+            price=195.00,
+            previous_price=194.00,
+            timestamp=1234567890.0,
+            session_reference=100.00,
+        )
+        assert update.session_change_percent == 95.0
+
+    def test_session_change_percent_zero_reference(self):
+        """A zero session_reference (falsy) doesn't raise a ZeroDivisionError."""
+        update = PriceUpdate(
+            ticker="AAPL",
+            price=100.00,
+            previous_price=100.00,
+            timestamp=1234567890.0,
+            session_reference=0.0,
+        )
+        assert update.session_change_percent == 0.0
 
     def test_immutability(self):
         """Test that PriceUpdate is immutable."""

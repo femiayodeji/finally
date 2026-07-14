@@ -1,0 +1,42 @@
+# E2E infrastructure (PLAN.md §12). Spins up the app container (LLM_MOCK=true
+# for fast, deterministic responses) plus a Playwright container that runs
+# the specs in this directory against it. Keeps browser dependencies out of
+# the production image (Dockerfile at the project root).
+#
+# Usage (from the project root):
+#   docker compose -f test/docker-compose.test.yml up --build --abort-on-container-exit
+#
+# The Integration Tester owns everything else under test/ — specs,
+# package.json, playwright.config.ts — this file only wires the two
+# containers together. Playwright's own base image already bundles Node,
+# browsers, and OS deps, so the test project just needs `npm ci` at
+# container start; no separate test/Dockerfile is required.
+
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    environment:
+      LLM_MOCK: "true"
+      OPENROUTER_API_KEY: "test-key"
+      MASSIVE_API_KEY: ""
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  playwright:
+    image: mcr.microsoft.com/playwright:v1.48.0-jammy
+    working_dir: /work
+    volumes:
+      - .:/work
+    environment:
+      BASE_URL: "http://app:8000"
+    depends_on:
+      app:
+        condition: service_healthy
+    command: sh -c "npm ci && npx playwright test"

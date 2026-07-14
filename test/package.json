@@ -1,0 +1,14 @@
+{
+  "name": "finally-e2e",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Playwright E2E suite for FinAlly (PLAN.md §12). Runs against a built frontend export served by the FastAPI backend, LLM_MOCK=true.",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0"
+  }
+}
