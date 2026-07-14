@@ -39,13 +39,13 @@ package and harden it. Every phase ends with something the user can see and do i
   4. The user can add a well-formed ticker (e.g. PYPL) and remove one; the change persists and streaming starts/stops accordingly (a removed ticker with an open position keeps streaming)
   5. Restarting the container preserves the watchlist (SQLite volume) and `GET /api/health` returns healthy
 
-**Plans**: 3/6 plans executed
+**Plans**: 4/6 plans executed
 Plans:
 
 - [x] 01-01-PLAN.md — Backend foundation: SQLite schema/init/seed + app/main.py wiring + health + static serving
 - [x] 01-02-PLAN.md — Market-data cache extensions: session reference price, ~600pt history ring buffer, session_change_percent
 - [x] 01-03-PLAN.md — Frontend scaffold + terminal shell: Next.js static export, Tailwind dark theme, live connection dot, placeholder panels
-- [ ] 01-04-PLAN.md — Prices & watchlist API + tracked-set (watchlist ∪ positions); router registration
+- [x] 01-04-PLAN.md — Prices & watchlist API + tracked-set (watchlist ∪ positions); router registration
 - [ ] 01-05-PLAN.md — Watchlist panel UI: flashing live prices, session change %, backfilled+growing sparklines, inline add/remove
 - [ ] 01-06-PLAN.md — Main detail chart UI: click-to-select, auto-select first ticker, filled-area chart backfill+live extend
 
@@ -138,7 +138,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Live Market Terminal | 3/6 | In Progress|  |
+| 1. Live Market Terminal | 4/6 | In Progress|  |
 | 2. Trading & Positions | 0/TBD | Not started | - |
 | 3. Portfolio Performance & Composition | 0/TBD | Not started | - |
 | 4. AI Copilot Chat | 0/TBD | Not started | - |
