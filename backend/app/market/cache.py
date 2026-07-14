@@ -3,9 +3,15 @@
 from __future__ import annotations
 
 import time
+from collections import deque
 from threading import Lock
 
 from .models import PriceUpdate
+
+# Bounded per-ticker rolling history: ~600 points at the ~500ms SSE cadence
+# is a few minutes of price action (PLAN.md §6). In-memory only, never
+# persisted — the durable time series lives in `portfolio_snapshots`.
+MAX_HISTORY_POINTS = 600
 
 
 class PriceCache:
@@ -19,26 +25,43 @@ class PriceCache:
         self._prices: dict[str, PriceUpdate] = {}
         self._lock = Lock()
         self._version: int = 0  # Monotonically increasing; bumped on every update
+        # Session reference (open) price per ticker, captured on first
+        # observation after process start and never overwritten (PLAN.md §6).
+        self._session_refs: dict[str, float] = {}
+        # Bounded per-ticker rolling price history ring buffer.
+        self._history: dict[str, deque[dict]] = {}
 
     def update(self, ticker: str, price: float, timestamp: float | None = None) -> PriceUpdate:
         """Record a new price for a ticker. Returns the created PriceUpdate.
 
         Automatically computes direction and change from the previous price.
         If this is the first update for the ticker, previous_price == price (direction='flat').
+        Captures the ticker's session reference price on first observation
+        (stable thereafter) and appends the tick to its rolling history buffer.
         """
         with self._lock:
             ts = timestamp or time.time()
             prev = self._prices.get(ticker)
             previous_price = prev.price if prev else price
+            rounded_price = round(price, 2)
+
+            # First observation for this ticker this process lifetime: capture
+            # the session reference (open) price. Never overwritten after.
+            session_reference = self._session_refs.setdefault(ticker, rounded_price)
 
             update = PriceUpdate(
                 ticker=ticker,
-                price=round(price, 2),
+                price=rounded_price,
                 previous_price=round(previous_price, 2),
                 timestamp=ts,
+                session_reference=session_reference,
             )
             self._prices[ticker] = update
             self._version += 1
+
+            history = self._history.setdefault(ticker, deque(maxlen=MAX_HISTORY_POINTS))
+            history.append({"timestamp": ts, "price": rounded_price})
+
             return update
 
     def get(self, ticker: str) -> PriceUpdate | None:
@@ -56,10 +79,27 @@ class PriceCache:
         update = self.get(ticker)
         return update.price if update else None
 
+    def get_history(self, ticker: str) -> list[dict]:
+        """Get the buffered rolling price history for a ticker.
+
+        Returns a list of {"timestamp": float, "price": float} dicts, oldest
+        first, bounded to MAX_HISTORY_POINTS. Returns an empty list for an
+        unknown ticker. The returned list is a copy — callers cannot mutate
+        the internal ring buffer.
+        """
+        with self._lock:
+            history = self._history.get(ticker)
+            return list(history) if history else []
+
     def remove(self, ticker: str) -> None:
-        """Remove a ticker from the cache (e.g., when removed from watchlist)."""
+        """Remove a ticker from the cache (e.g., when removed from watchlist).
+
+        Clears the ticker's latest price, session reference, and history.
+        """
         with self._lock:
             self._prices.pop(ticker, None)
+            self._session_refs.pop(ticker, None)
+            self._history.pop(ticker, None)
 
     @property
     def version(self) -> int:
