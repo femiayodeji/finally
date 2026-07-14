@@ -109,15 +109,68 @@
 
 Which phases cover which requirements. Populated during roadmap creation.
 
+> Note: the earlier "43 total" figure undercounted — it omitted the Deployment (4) and Testing (5) requirements. The full v1 set is **52** requirements, all mapped below.
+
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| (populated by roadmapper) | | |
+| DB-01 | Phase 1 | Pending |
+| DB-02 | Phase 1 | Pending |
+| DB-03 | Phase 1 | Pending |
+| DB-04 | Phase 1 | Pending |
+| APP-01 | Phase 1 | Pending |
+| APP-02 | Phase 1 | Pending |
+| APP-03 | Phase 1 | Pending |
+| APP-04 | Phase 1 | Pending |
+| APP-05 | Phase 3 | Pending |
+| MKT-01 | Phase 1 | Pending |
+| MKT-02 | Phase 1 | Pending |
+| MKT-03 | Phase 1 | Pending |
+| MKT-04 | Phase 1 | Pending |
+| MKT-05 | Phase 1 | Pending |
+| PORT-01 | Phase 2 | Pending |
+| PORT-02 | Phase 2 | Pending |
+| PORT-03 | Phase 2 | Pending |
+| PORT-04 | Phase 2 | Pending |
+| PORT-05 | Phase 2 | Pending |
+| PORT-06 | Phase 3 | Pending |
+| PORT-07 | Phase 3 | Pending |
+| PORT-08 | Phase 2 | Pending |
+| WATCH-01 | Phase 1 | Pending |
+| WATCH-02 | Phase 1 | Pending |
+| WATCH-03 | Phase 1 | Pending |
+| WATCH-04 | Phase 1 | Pending |
+| CHAT-01 | Phase 4 | Pending |
+| CHAT-02 | Phase 4 | Pending |
+| CHAT-03 | Phase 4 | Pending |
+| CHAT-04 | Phase 4 | Pending |
+| CHAT-05 | Phase 4 | Pending |
+| CHAT-06 | Phase 4 | Pending |
+| CHAT-07 | Phase 4 | Pending |
+| UI-01 | Phase 1 | Pending |
+| UI-02 | Phase 1 | Pending |
+| UI-03 | Phase 2 | Pending |
+| UI-04 | Phase 2 | Pending |
+| UI-05 | Phase 3 | Pending |
+| UI-06 | Phase 3 | Pending |
+| UI-07 | Phase 4 | Pending |
+| UI-08 | Phase 2 | Pending |
+| UI-09 | Phase 1 | Pending |
+| UI-10 | Phase 1 | Pending |
+| DEPLOY-01 | Phase 5 | Pending |
+| DEPLOY-02 | Phase 5 | Pending |
+| DEPLOY-03 | Phase 5 | Pending |
+| DEPLOY-04 | Phase 5 | Pending |
+| TEST-01 | Phase 6 | Pending |
+| TEST-02 | Phase 6 | Pending |
+| TEST-03 | Phase 6 | Pending |
+| TEST-04 | Phase 6 | Pending |
+| TEST-05 | Phase 6 | Pending |
 
 **Coverage:**
-- v1 requirements: 43 total
-- Mapped to phases: 0 (pending roadmap)
-- Unmapped: 43 ⚠️
+- v1 requirements: 52 total
+- Mapped to phases: 52 ✓
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-07-14*
-*Last updated: 2026-07-14 after initial definition*
+*Last updated: 2026-07-14 after roadmap creation (traceability populated, count corrected 43 → 52)*
