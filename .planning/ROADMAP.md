@@ -16,7 +16,7 @@ package and harden it. Every phase ends with something the user can see and do i
 - Integer phases (1, 2, 3): Planned milestone work
 - Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
 
-- [ ] **Phase 1: Live Market Terminal** - Foundation + streaming prices + editable watchlist visible in the browser
+- [x] **Phase 1: Live Market Terminal** - Foundation + streaming prices + editable watchlist visible in the browser (completed 2026-07-14)
 - [ ] **Phase 2: Trading & Positions** - Buy/sell with instant fills, positions table, live header financials
 - [ ] **Phase 3: Portfolio Performance & Composition** - P&L-colored heatmap and portfolio-value-over-time chart
 - [ ] **Phase 4: AI Copilot Chat** - LLM chat that analyzes the portfolio and auto-executes trades & watchlist changes
@@ -39,15 +39,15 @@ package and harden it. Every phase ends with something the user can see and do i
   4. The user can add a well-formed ticker (e.g. PYPL) and remove one; the change persists and streaming starts/stops accordingly (a removed ticker with an open position keeps streaming)
   5. Restarting the container preserves the watchlist (SQLite volume) and `GET /api/health` returns healthy
 
-**Plans**: 4/6 plans executed
+**Plans**: 6/6 plans complete
 Plans:
 
 - [x] 01-01-PLAN.md — Backend foundation: SQLite schema/init/seed + app/main.py wiring + health + static serving
 - [x] 01-02-PLAN.md — Market-data cache extensions: session reference price, ~600pt history ring buffer, session_change_percent
 - [x] 01-03-PLAN.md — Frontend scaffold + terminal shell: Next.js static export, Tailwind dark theme, live connection dot, placeholder panels
 - [x] 01-04-PLAN.md — Prices & watchlist API + tracked-set (watchlist ∪ positions); router registration
-- [ ] 01-05-PLAN.md — Watchlist panel UI: flashing live prices, session change %, backfilled+growing sparklines, inline add/remove
-- [ ] 01-06-PLAN.md — Main detail chart UI: click-to-select, auto-select first ticker, filled-area chart backfill+live extend
+- [x] 01-05-PLAN.md — Watchlist panel UI: flashing live prices, session change %, backfilled+growing sparklines, inline add/remove
+- [x] 01-06-PLAN.md — Main detail chart UI: click-to-select, auto-select first ticker, filled-area chart backfill+live extend
 
 **UI hint**: yes
 
@@ -138,7 +138,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Live Market Terminal | 4/6 | In Progress|  |
+| 1. Live Market Terminal | 6/6 | Complete   | 2026-07-14 |
 | 2. Trading & Positions | 0/TBD | Not started | - |
 | 3. Portfolio Performance & Composition | 0/TBD | Not started | - |
 | 4. AI Copilot Chat | 0/TBD | Not started | - |
