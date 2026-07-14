@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply bg-canvas;
+  color: #e6edf3;
+  font-family: var(--font-inter), Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+
+/* Numeric readouts (prices, change %, cash/total stubs) must not shift width
+   on every ~500ms SSE update — load-bearing for a live-flashing terminal
+   (01-UI-SPEC.md "Font"). Tailwind's built-in `tabular-nums` utility applies
+   this; `.numeric` is a semantic alias for readability at call sites. */
+.numeric {
+  font-variant-numeric: tabular-nums;
+}
