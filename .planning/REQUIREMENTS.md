@@ -9,17 +9,17 @@
 
 ### Database
 
-- [ ] **DB-01**: On startup (before the market-data task), the backend creates the SQLite schema (users_profile, watchlist, positions, trades, portfolio_snapshots, chat_messages) if missing
-- [ ] **DB-02**: On a fresh database, the backend seeds one default user (cash `10000.0`) and the 10 default watchlist tickers (AAPL, GOOGL, MSFT, AMZN, TSLA, NVDA, META, JPM, V, NFLX)
-- [ ] **DB-03**: The SQLite file persists at `db/finally.db` across restarts via the mounted volume
-- [ ] **DB-04**: Every table carries a `user_id` column defaulting to `"default"` (single-user, multi-user-ready)
+- [x] **DB-01**: On startup (before the market-data task), the backend creates the SQLite schema (users_profile, watchlist, positions, trades, portfolio_snapshots, chat_messages) if missing
+- [x] **DB-02**: On a fresh database, the backend seeds one default user (cash `10000.0`) and the 10 default watchlist tickers (AAPL, GOOGL, MSFT, AMZN, TSLA, NVDA, META, JPM, V, NFLX)
+- [x] **DB-03**: The SQLite file persists at `db/finally.db` across restarts via the mounted volume
+- [x] **DB-04**: Every table carries a `user_id` column defaulting to `"default"` (single-user, multi-user-ready)
 
 ### App Wiring
 
-- [ ] **APP-01**: The FastAPI app registers all routers — stream, prices, portfolio, watchlist, chat, health
-- [ ] **APP-02**: The backend serves the static Next.js export for all non-`/api` routes on port 8000
-- [ ] **APP-03**: The market-data background task starts at app startup, seeded from watchlist ∪ open positions
-- [ ] **APP-04**: `GET /api/health` returns a healthy status for Docker/deployment checks
+- [x] **APP-01**: The FastAPI app registers all routers — stream, prices, portfolio, watchlist, chat, health
+- [x] **APP-02**: The backend serves the static Next.js export for all non-`/api` routes on port 8000
+- [x] **APP-03**: The market-data background task starts at app startup, seeded from watchlist ∪ open positions
+- [x] **APP-04**: `GET /api/health` returns a healthy status for Docker/deployment checks
 - [ ] **APP-05**: A background task records a `portfolio_snapshots` row every 30 seconds
 
 ### Market Data Extensions
@@ -113,14 +113,14 @@ Which phases cover which requirements. Populated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DB-01 | Phase 1 | Pending |
-| DB-02 | Phase 1 | Pending |
-| DB-03 | Phase 1 | Pending |
-| DB-04 | Phase 1 | Pending |
-| APP-01 | Phase 1 | Pending |
-| APP-02 | Phase 1 | Pending |
-| APP-03 | Phase 1 | Pending |
-| APP-04 | Phase 1 | Pending |
+| DB-01 | Phase 1 | Complete |
+| DB-02 | Phase 1 | Complete |
+| DB-03 | Phase 1 | Complete |
+| DB-04 | Phase 1 | Complete |
+| APP-01 | Phase 1 | Complete |
+| APP-02 | Phase 1 | Complete |
+| APP-03 | Phase 1 | Complete |
+| APP-04 | Phase 1 | Complete |
 | APP-05 | Phase 3 | Pending |
 | MKT-01 | Phase 1 | Pending |
 | MKT-02 | Phase 1 | Pending |
@@ -167,6 +167,7 @@ Which phases cover which requirements. Populated during roadmap creation.
 | TEST-05 | Phase 6 | Pending |
 
 **Coverage:**
+
 - v1 requirements: 52 total
 - Mapped to phases: 52 ✓
 - Unmapped: 0 ✓
