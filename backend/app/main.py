@@ -24,7 +24,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from app import db
-from app.api import health_router
+from app.api import create_prices_router, create_watchlist_router, health_router
 from app.market import create_market_data_source, create_stream_router
 from app.market.cache import PriceCache
 
@@ -101,12 +101,21 @@ def create_app() -> FastAPI:
     # Registered before the static mount below (StaticFiles must be mounted
     # last so it never shadows /api/* — T-01-01). Add new routers to this
     # block as later plans build them:
-    #   - GET /api/prices/{ticker}/history          (Plan 04)
-    #   - GET/POST/DELETE /api/watchlist             (Plan 04)
+    #   - GET /api/prices/{ticker}/history          (Plan 04) ✅
+    #   - GET/POST/DELETE /api/watchlist             (Plan 04) ✅
     #   - GET /api/portfolio, POST /api/portfolio/trade, GET /api/portfolio/history (Plan 03)
     #   - POST /api/chat                             (Plan 05/06)
+    #
+    # create_prices_router/create_watchlist_router close over `cache` only
+    # (available here, before the lifespan runs). The watchlist router's
+    # mutating routes read `request.app.state.market_source` at request
+    # time instead, since the market source isn't constructed until inside
+    # the lifespan above (APP-03 order: db.initialize() -> tracked tickers
+    # -> source.start()) — see app/api/watchlist.py module docstring.
     app.include_router(health_router)
     app.include_router(create_stream_router(cache))
+    app.include_router(create_prices_router(cache))
+    app.include_router(create_watchlist_router(cache))
 
     _mount_static(app)
 
